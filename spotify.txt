@@ -1,0 +1,119 @@
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+
+
+df = pd.read_csv("spotify dataset.csv", header=None)
+
+
+df.columns = [
+    'track_id', 'track_name', 'track_artist', 'track_popularity',
+    'track_album_id', 'track_album_name', 'release_date',
+    'playlist_name', 'playlist_id', 'playlist_genre',
+    'playlist_subgenre', 'danceability', 'energy', 'key',
+    'loudness', 'mode', 'speechiness', 'acousticness',
+    'instrumentalness', 'liveness', 'valence',
+    'tempo', 'duration_ms'
+]
+
+print("✅ Columns assigned successfully!")
+
+
+df = df.apply(pd.to_numeric, errors='ignore')
+
+
+df = df.drop(columns=[
+    'track_id', 'track_name', 'track_artist',
+    'track_album_id', 'track_album_name', 'release_date',
+    'playlist_name', 'playlist_id', 'playlist_genre',
+    'playlist_subgenre'
+])
+
+
+df['popular'] = df['track_popularity'].apply(lambda x: 1 if x > 60 else 0)
+
+
+df = df.drop(columns=['track_popularity'])
+
+
+df = df.fillna(0)
+
+
+X = df.drop('popular', axis=1)
+y = df['popular']
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+
+model = Sequential()
+
+model.add(Dense(64, activation='relu', input_shape=(X_train.shape[1],)))
+model.add(Dense(32, activation='relu'))
+model.add(Dense(16, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+
+
+model.compile(
+    optimizer='adam',
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)
+
+
+history = model.fit(
+    X_train, y_train,
+    epochs=20,
+    batch_size=32,
+    validation_split=0.2
+)
+
+
+y_pred = model.predict(X_test)
+y_pred = (y_pred > 0.5)
+
+accuracy = accuracy_score(y_test, y_pred)
+print("\n✅ Model Accuracy:", accuracy)
+
+
+cm = confusion_matrix(y_test, y_pred)
+print("\nConfusion Matrix:\n", cm)
+
+
+model.save("spotify_model.h5")
+print("\n💾 Model saved successfully!")
+
+
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title("Model Accuracy")
+plt.xlabel("Epochs")
+plt.ylabel("Accuracy")
+plt.legend()
+plt.show()
+
+
+print("\n🎯 Sample Prediction:")
+
+sample = X_test[0].reshape(1, -1)
+prediction = model.predict(sample)
+
+if prediction > 0.5:
+    print("Popular Song 🎵")
+else:
+    print("Not Popular Song ❌")
